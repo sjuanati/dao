@@ -11,11 +11,26 @@ pragma solidity ^0.6.12;
  */
 
 contract DAO {
+    struct Proposal {
+        uint256 id;
+        string name;
+        uint256 amount;
+        address payable recipient;
+        uint256 votes;
+        uint256 end;
+        bool executed;
+    }
     mapping(address => bool) public investors;
     mapping(address => uint256) public shares;
+    mapping(uint256 => Proposal) public proposals;
+    mapping(address => mapping(uint256 => bool)) public votes;
     uint256 public totalShares;
     uint256 public availableFunds;
     uint256 public contributionEnd;
+    uint256 public nextProposalId;
+    uint256 public voteTime;
+    uint256 public quorum; // minimum propostion of votes required to execute a proposal
+    address public admin;
 
     constructor(uint256 contributionTime) public {
         contributionEnd = block.timestamp + contributionTime;
@@ -48,5 +63,43 @@ contract DAO {
         shares[msg.sender] -= amount;
         shares[to] += amount;
         investors[to] = true;
+    }
+
+    function createProposal(
+        string memory name,
+        uint256 amount,
+        address payable recipient
+    ) external onlyInvestors {
+        require(availableFunds >= amount, "amount too big");
+        proposals[nextProposalId] = Proposal(
+            nextProposalId,
+            name,
+            amount,
+            recipient,
+            0,
+            block.timestamp + voteTime,
+            false
+        );
+        availableFunds -= amount; // we commit to spend a portion of the funds
+        nextProposalId++;
+    }
+
+    function vote(uint256 proposalId) external onlyInvestors {
+        Proposal storage proposal = proposals[proposalId]; // Storage pointer
+        require(
+            votes[msg.sender][proposalId] == false,
+            "investor can only vote once for a proposal"
+        );
+        require(
+            block.timestamp < proposal.end,
+            "can only vote until proposal end"
+        );
+        votes[msg.sender][proposalId] = true;
+        proposal.votes += shares[msg.sender]; // vote proportional to the shares
+    }
+
+    modifier onlyInvestors() {
+        require(investors[msg.sender] == true, "only investors");
+        _;
     }
 }
