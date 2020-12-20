@@ -32,8 +32,12 @@ contract DAO {
     uint256 public quorum; // minimum propostion of votes required to execute a proposal
     address public admin;
 
-    constructor(uint256 contributionTime) public {
+    constructor(uint256 contributionTime, uint _voteTime, uint _quorum) public {
+        require(_quorum > 0 && _quorum < 100, 'quorum must be between 0 and 100');
         contributionEnd = block.timestamp + contributionTime;
+        voteTime = _voteTime;
+        quorum = _quorum;
+        admin = msg.sender;
     }
 
     function contribute() external payable {
@@ -98,8 +102,47 @@ contract DAO {
         proposal.votes += shares[msg.sender]; // vote proportional to the shares
     }
 
+    function executeProposal(uint256 proposalId) external onlyAdmin() {
+        Proposal storage proposal = proposals[proposalId]; // Storage pointer
+        require(
+            block.timestamp >= proposal.end,
+            "cannot execute a proposal before end date"
+        );
+        require(
+            proposal.executed == false,
+            "cannot execute a proposal already executed"
+        );
+        require(
+            (proposal.votes / totalShares) * 100 >= quorum,
+            "cannot execute a proposal with votes below quorum"
+        );
+        _transferEther(proposal.amount, proposal.recipient);
+    }
+
+    function withdrawEther(uint256 amount, address payable to)
+        external
+        onlyAdmin()
+    {
+        _transferEther(amount, to);
+    }
+
+    receive() external payable {
+        availableFunds += msg.value;
+    }
+
+    function _transferEther(uint256 amount, address payable to) internal {
+        require(amount <= availableFunds, "not enough availableFunds");
+        availableFunds -= amount;
+        to.transfer(amount);
+    }
+
     modifier onlyInvestors() {
         require(investors[msg.sender] == true, "only investors");
+        _;
+    }
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "only admin");
         _;
     }
 }
