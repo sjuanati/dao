@@ -17,15 +17,36 @@ contract DAO {
     uint256 public availableFunds;
     uint256 public contributionEnd;
 
-    constructor(uint contributionTime) public {
+    constructor(uint256 contributionTime) public {
         contributionEnd = block.timestamp + contributionTime;
     }
 
-    function contribute() payable external {
-        require(block.timestamp < contributionEnd, 'cannot contribute after contributionEnd');
+    function contribute() external payable {
+        require(
+            block.timestamp < contributionEnd,
+            "cannot contribute after contributionEnd"
+        );
         investors[msg.sender] = true;
-        shares[msg.sender] += msg.value;    // 1 wei = 1 share
+        shares[msg.sender] += msg.value; // 1 wei = 1 share
         totalShares += msg.value;
         availableFunds += msg.value;
+    }
+
+    function redeemShare(uint256 amount) external {
+        require(shares[msg.sender] >= amount, "not enough shares");
+        require(availableFunds >= amount, "not enough availableFunds");
+        shares[msg.sender] -= amount;
+        availableFunds -= amount;
+        msg.sender.transfer(amount);
+    }
+
+    function transferShare(uint256 amount, address to) external {
+        require(
+            block.timestamp < contributionEnd,
+            "cannot contribute after contributionEnd"
+        );
+        shares[msg.sender] -= amount;
+        shares[to] += amount;
+        investors[to] = true;
     }
 }
