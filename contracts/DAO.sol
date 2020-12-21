@@ -116,15 +116,13 @@ contract DAO {
         votes[msg.sender][proposalId] = true;
         proposal.votes += shares[msg.sender]; // vote proportional to the shares
 
-        uint result = ((proposal.votes * 100) / totalShares);
-
-        emit Vote(
-            proposalId,
-            proposal.name,
-            proposal.votes,
-            totalShares,
-            result
-        );
+        // emit Vote(
+        //     proposalId,
+        //     proposal.name,
+        //     proposal.votes,
+        //     totalShares,
+        //     quorum
+        // );
     }
 
     function executeProposal(uint256 proposalId) external onlyAdmin() {

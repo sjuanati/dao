@@ -104,39 +104,63 @@ contract('DAO', (accounts) => {
         await dao.vote(1, { from: investor2 });
         await time.increase(5);
 
-        const proposal = await dao.proposals(1);
-        const totalSh = await dao.totalShares();
-        const totalShares = totalSh.toNumber();
-        const quorum = await dao.quorum();
-        const proposal_votes = proposal.votes.toNumber();
-        
-        console.log('name', proposal.name);
-        console.log('voproposal_votes', proposal_votes);
-        console.log('totalShares', totalShares);
-        console.log('quorum', quorum.toNumber());
-
-        const perc = ((proposal_votes / totalShares) * 100);
-        console.log('percentage', perc)
-
+        const availableFundsBefore = await dao.availableFunds();
         await dao.executeProposal(1, { from: accounts[0] });
+        const availableFundsAfter = await dao.availableFunds();
+
+        assert((availableFundsBefore.toNumber() - 400) === availableFundsAfter.toNumber());
+    });
+
+    it('Should NOT execute proposal if not enough votes', async () => {
+        await dao.createProposal('DAI v4', 100, investor3, { from: investor1 });
+        await dao.vote(2, { from: investor1 });
+        await time.increase(5);
+
+        expectRevert(
+            dao.executeProposal(2, { from: accounts[0] }),
+            'cannot execute a proposal with votes # below quorum'
+        );
+    });
+
+    // it('Should NOT execute proposal twice', async () => {
+    //     expectRevert(
+    //         dao.executeProposal(1, { from: accounts[0] }),
+    //         'cannot execute a proposal already executed'
+    //     );
+    // });
+
+    it('Should NOT execute proposal before end date', async () => {
+        await dao.createProposal('DAI v5', 100, investor3, { from: investor1 });
+        await dao.vote(3, { from: investor2 });
+
+        expectRevert(
+            dao.executeProposal(3, { from: accounts[0] }),
+            'cannot execute a proposal before end date'
+        );
+    });
+
+    it('Should withdraw ether', async () => {
+        const balanceBefore = await web3.eth.getBalance(investor3);
+        await dao.withdrawEther(5, investor3);
+        const balanceAfter = await web3.eth.getBalance(investor3);
+        const balanceBeforeBN = await web3.utils.toBN(balanceBefore);
+        const balanceAfterBN = await web3.utils.toBN(balanceAfter);
+
+        assert(balanceAfterBN.sub(balanceBeforeBN).toNumber() === 5);
 
     });
 
-    // it('Should NOT execute proposal if not enough votes', async () => {
-    // });
+    it('Should NOT withdraw ether if not admin', async () => {
+        expectRevert(
+            dao.withdrawEther(5, investor3, {from: investor3}),
+            'only admin'
+        );
+    });
 
-    // it('Should NOT execute proposal twice', async () => {
-    // });
-
-    // it('Should NOT execute proposal before end date', async () => {
-    // });
-
-    // it('Should withdraw ether', async () => {
-    // });
-
-    // it('Should NOT withdraw ether if not admin', async () => {
-    // });
-
-    // it('Should NOT withdraw ether if trying to withdraw too much', async () => {
-    // });
+    it('Should NOT withdraw ether if trying to withdraw too much', async () => {
+        expectRevert(
+            dao.withdrawEther(5000, investor3, {from: accounts[0]}),
+            'not enough availableFunds'
+        );
+    });
 });
