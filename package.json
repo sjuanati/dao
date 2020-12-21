@@ -8,5 +8,8 @@
   },
   "author": "",
   "license": "ISC",
-  "dependencies": {}
+  "dependencies": {
+    "@openzeppelin/test-helpers": "^0.5.9",
+    "@types/jest": "^26.0.19"
+  }
 }

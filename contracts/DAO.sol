@@ -26,14 +26,29 @@ contract DAO {
     mapping(address => mapping(uint256 => bool)) public votes;
     uint256 public totalShares;
     uint256 public availableFunds;
-    uint256 public contributionEnd;
+    uint256 public contributionEnd; // end date of the contribution period
     uint256 public nextProposalId;
-    uint256 public voteTime;
+    uint256 public voteTime; // time to vote for each proposal
     uint256 public quorum; // minimum propostion of votes required to execute a proposal
     address public admin;
 
-    constructor(uint256 contributionTime, uint _voteTime, uint _quorum) public {
-        require(_quorum > 0 && _quorum < 100, 'quorum must be between 0 and 100');
+    event Vote(
+        uint256 indexed id,
+        string name,
+        uint256 votes,
+        uint256 shares,
+        uint256 quorum
+    );
+
+    constructor(
+        uint256 contributionTime,
+        uint256 _voteTime,
+        uint256 _quorum
+    ) public {
+        require(
+            _quorum > 0 && _quorum < 100,
+            "quorum must be between 0 and 100"
+        );
         contributionEnd = block.timestamp + contributionTime;
         voteTime = _voteTime;
         quorum = _quorum;
@@ -73,7 +88,7 @@ contract DAO {
         string memory name,
         uint256 amount,
         address payable recipient
-    ) external onlyInvestors {
+    ) external onlyInvestors() {
         require(availableFunds >= amount, "amount too big");
         proposals[nextProposalId] = Proposal(
             nextProposalId,
@@ -88,7 +103,7 @@ contract DAO {
         nextProposalId++;
     }
 
-    function vote(uint256 proposalId) external onlyInvestors {
+    function vote(uint256 proposalId) external onlyInvestors() {
         Proposal storage proposal = proposals[proposalId]; // Storage pointer
         require(
             votes[msg.sender][proposalId] == false,
@@ -100,10 +115,21 @@ contract DAO {
         );
         votes[msg.sender][proposalId] = true;
         proposal.votes += shares[msg.sender]; // vote proportional to the shares
+
+        uint result = ((proposal.votes * 100) / totalShares);
+
+        emit Vote(
+            proposalId,
+            proposal.name,
+            proposal.votes,
+            totalShares,
+            result
+        );
     }
 
     function executeProposal(uint256 proposalId) external onlyAdmin() {
         Proposal storage proposal = proposals[proposalId]; // Storage pointer
+
         require(
             block.timestamp >= proposal.end,
             "cannot execute a proposal before end date"
@@ -112,9 +138,10 @@ contract DAO {
             proposal.executed == false,
             "cannot execute a proposal already executed"
         );
+        // ((proposal.votes / totalShares) * 100) >= quorum,  will fail!
         require(
-            (proposal.votes / totalShares) * 100 >= quorum,
-            "cannot execute a proposal with votes below quorum"
+            ((proposal.votes * 100) / totalShares)  >= quorum,
+            "cannot execute a proposal with votes # below quorum"
         );
         _transferEther(proposal.amount, proposal.recipient);
     }
